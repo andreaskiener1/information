@@ -21,6 +21,13 @@
             padding: 10px;
             text-align: center;
         }
+        .button-container {
+            margin-top: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
@@ -29,7 +36,11 @@
 
     <textarea id="inputText" rows="10" cols="50" placeholder="Gib deinen Text hier ein..."></textarea>
     <br><br>
-    <button onclick="performAnalysis()">Analysiere den Text</button>
+
+    <div class="button-container">
+        <button onclick="performAnalysis()">Analysiere den Text</button>
+        <button onclick="clearText()">Text löschen</button>
+    </div>
 
     <div id="output" style="margin-top: 20px;"></div>
 
@@ -116,6 +127,11 @@
 
         function calculatePerplexity(avgInfoContent) {
             return Math.pow(2, avgInfoContent);
+        }
+
+        function clearText() {
+            document.getElementById('inputText').value = '';
+            document.getElementById('output').innerHTML = '';
         }
     </script>
 

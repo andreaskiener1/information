@@ -28,6 +28,23 @@
             padding: 10px 20px;
             margin-right: 10px;
         }
+        .code-output {
+            margin-top: 20px;
+        }
+        .tree-output {
+            margin-top: 20px;
+            white-space: pre;
+            font-family: monospace;
+        }
+        .svg-container {
+            margin-top: 20px;
+            border: 1px solid black;
+            width: 100%;
+            height: 500px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
     </style>
 </head>
 <body>
@@ -40,11 +57,19 @@
     <div class="button-container">
         <button onclick="performAnalysis()">Analysiere den Text</button>
         <button onclick="clearText()">Text löschen</button>
+        <button onclick="performHuffman()">Huffman-Codierung</button>
+        <button onclick="displayHuffmanTree()">Huffman-Baum anzeigen</button>
     </div>
 
     <div id="output" style="margin-top: 20px;"></div>
+    <div id="codeOutput" class="code-output"></div>
+    <div id="treeOutput" class="tree-output"></div>
+    <div id="svgTree" class="svg-container"></div>
 
     <script>
+        let huffmanTree; // Variable to store the Huffman Tree for later use
+
+        // Textanalyse Funktionen
         function performAnalysis() {
             const text = document.getElementById('inputText').value;
             const outputDiv = document.getElementById('output');
@@ -56,8 +81,12 @@
 
             const stats = calculateStatistics(text);
             const infoContent = calculateInformationContent(stats);
-            const avgInfoContent = calculateAvgInformationContent(infoContent);
+            const avgInfoContent = calculateAvgInformationContent(infoContent, text);
             const perplexity = calculatePerplexity(avgInfoContent);
+            const totalInfoContent = calculateTotalInformationContent(infoContent, stats);
+
+            // Sortiere die Zeichen nach Häufigkeit (aufsteigend)
+            const sortedStats = Object.keys(stats).sort((a, b) => stats[a].count - stats[b].count);
 
             let resultHTML = `<table>
                                 <tr>
@@ -67,7 +96,8 @@
                                     <th>Informationsgehalt (bits)</th>
                                 </tr>`;
 
-            for (const char in stats) {
+            // Erstelle die Tabelle in sortierter Reihenfolge
+            for (const char of sortedStats) {
                 resultHTML += `<tr>
                                 <td>${char}</td>
                                 <td>${stats[char].count}</td>
@@ -79,7 +109,8 @@
             resultHTML += `</table>
                            <p>Anzahl der Zeichen (inkl. Leerzeichen, Punkt, Komma): ${text.length}</p>
                            <p>Mittlerer Informationsgehalt: ${avgInfoContent.toFixed(4)} bits</p>
-                           <p>Perplexität: ${perplexity.toFixed(4)}</p>`;
+                           <p>Perplexität: ${perplexity.toFixed(4)}</p>
+                           <p>Gesamtinformationsgehalt: ${totalInfoContent.toFixed(4)} bits</p>`;
 
             outputDiv.innerHTML = resultHTML;
         }
@@ -113,28 +144,237 @@
             return infoContent;
         }
 
-        function calculateAvgInformationContent(infoContent) {
+        function calculateAvgInformationContent(infoContent, text) {
             let totalInfo = 0;
-            let totalChars = 0;
 
             for (const char in infoContent) {
-                totalInfo += infoContent[char];
-                totalChars++;
+                totalInfo += infoContent[char] * (text.split(char).length - 1);  // Häufigkeit des Zeichens * Informationsgehalt des Zeichens
             }
 
-            return totalInfo / totalChars;
+            return totalInfo / text.length;
         }
 
         function calculatePerplexity(avgInfoContent) {
             return Math.pow(2, avgInfoContent);
         }
 
+        function calculateTotalInformationContent(infoContent, stats) {
+            let totalInfoContent = 0;
+
+            for (const char in stats) {
+                totalInfoContent += stats[char].count * infoContent[char]; // Häufigkeit des Zeichens * Informationsgehalt des Zeichens
+            }
+
+            return totalInfoContent;
+        }
+
         function clearText() {
             document.getElementById('inputText').value = '';
             document.getElementById('output').innerHTML = '';
+            document.getElementById('codeOutput').innerHTML = '';
+            document.getElementById('treeOutput').innerHTML = '';
+            document.getElementById('svgTree').innerHTML = '';
+        }
+
+        // Huffman Algorithmus Funktionen
+        function performHuffman() {
+            const text = document.getElementById('inputText').value;
+            const codeOutputDiv = document.getElementById('codeOutput');
+
+            if (!text) {
+                codeOutputDiv.innerHTML = "<p>Bitte gib einen Text ein.</p>";
+                return;
+            }
+
+            const frequency = calculateFrequency(text);
+            huffmanTree = buildHuffmanTree(frequency); // Store the tree for later use
+            const huffmanCodes = generateHuffmanCodes(huffmanTree);
+
+            const encodedText = encodeText(text, huffmanCodes);
+            const totalBits = encodedText.length;
+
+            let codeTableHTML = `<h3>Huffman Codetabelle</h3>
+                                <table>
+                                    <tr>
+                                        <th>Zeichen</th>
+                                        <th>Code</th>
+                                    </tr>`;
+            for (const char in huffmanCodes) {
+                codeTableHTML += `<tr>
+                                    <td>${char}</td>
+                                    <td>${huffmanCodes[char]}</td>
+                                  </tr>`;
+            }
+            codeTableHTML += `</table>`;
+
+            codeOutputDiv.innerHTML = codeTableHTML + `<p>Kodierter Text: ${encodedText}</p><p>Anzahl der notwendigen Bits: ${totalBits}</p>`;
+        }
+
+        function calculateFrequency(text) {
+            const frequency = {};
+            for (const char of text) {
+                if (!frequency[char]) {
+                    frequency[char] = 0;
+                }
+                frequency[char]++;
+            }
+            return frequency;
+        }
+
+        function buildHuffmanTree(frequency) {
+            const nodes = Object.keys(frequency).map(char => ({ char, freq: frequency[char], left: null, right: null }));
+            while (nodes.length > 1) {
+                nodes.sort((a, b) => a.freq - b.freq);
+                const left = nodes.shift();
+                const right = nodes.shift();
+                const newNode = {
+                    char: null,
+                    freq: left.freq + right.freq,
+                    left: left,
+                    right: right
+                };
+                nodes.push(newNode);
+            }
+            return nodes[0];
+        }
+
+        function generateHuffmanCodes(tree, prefix = '', codes = {}) {
+            if (tree.char !== null) {
+                codes[tree.char] = prefix;
+            } else {
+                generateHuffmanCodes(tree.left, prefix + '0', codes);
+                generateHuffmanCodes(tree.right, prefix + '1', codes);
+            }
+            return codes;
+        }
+
+        function encodeText(text, codes) {
+            return text.split('').map(char => codes[char]).join('');
+        }
+
+        // Funktion zum Anzeigen des Huffman-Baums
+        function displayHuffmanTree() {
+            const treeOutputDiv = document.getElementById('treeOutput');
+            const svgTreeDiv = document.getElementById('svgTree');
+            
+            if (!huffmanTree) {
+                treeOutputDiv.innerHTML = "<p>Bitte zuerst die Huffman-Codierung durchführen.</p>";
+                return;
+            }
+
+            // Textuelle Anzeige des Baums
+            const treeStructure = displayTree(huffmanTree);
+            treeOutputDiv.innerHTML = `<h3>Huffman Baum:</h3><pre>${treeStructure}</pre>`;
+
+            // Grafische Anzeige des Baums
+            svgTreeDiv.innerHTML = '';
+            const svgNS = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgNS, "svg");
+            svg.setAttribute("width", "800");
+            svg.setAttribute("height", "600");
+
+            drawHuffmanTree(svg, huffmanTree, 400, 50, 200, 50);
+
+            svgTreeDiv.appendChild(svg);
+        }
+
+        function displayTree(node, indent = '') {
+            if (node.char !== null) {
+                return `${indent}Char: '${node.char}', Freq: ${node.freq}\n`;
+            }
+            let result = `${indent}Node (Freq: ${node.freq})\n`;
+            result += displayTree(node.left, indent + '  ');
+            result += displayTree(node.right, indent + '  ');
+            return result;
+        }
+
+        // Zeichnen des Huffman-Baums mit SVG
+        function drawHuffmanTree(svg, node, x, y, xOffset, yOffset) {
+            const svgNS = "http://www.w3.org/2000/svg";
+
+            // Zeichne die Linien zu den Kindern
+            if (node.left) {
+                const leftX = x - xOffset;
+                const leftY = y + yOffset;
+                drawLine(svg, x, y, leftX, leftY, "0");
+                drawHuffmanTree(svg, node.left, leftX, leftY, xOffset / 2, yOffset);
+            }
+            if (node.right) {
+                const rightX = x + xOffset;
+                const rightY = y + yOffset;
+                drawLine(svg, x, y, rightX, rightY, "1");
+                drawHuffmanTree(svg, node.right, rightX, rightY, xOffset / 2, yOffset);
+            }
+
+            // Zeichne den Knoten als Kreis oder Quadrat
+            if (node.char !== null) {
+                // Zeichne Quadrat für Zeichen
+                drawSquare(svg, x, y, node.char, node.freq);
+            } else {
+                // Zeichne Kreis für inneren Knoten
+                drawCircle(svg, x, y, node.freq);
+            }
+        }
+
+        function drawLine(svg, x1, y1, x2, y2, label) {
+            const svgNS = "http://www.w3.org/2000/svg";
+            const line = document.createElementNS(svgNS, "line");
+            line.setAttribute("x1", x1);
+            line.setAttribute("y1", y1);
+            line.setAttribute("x2", x2);
+            line.setAttribute("y2", y2);
+            line.setAttribute("stroke", "black");
+            svg.appendChild(line);
+
+            // Beschriftung der Linie
+            const text = document.createElementNS(svgNS, "text");
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+            text.setAttribute("x", midX);
+            text.setAttribute("y", midY - 5); // Verschiebe den Text leicht nach oben
+            text.setAttribute("text-anchor", "middle");
+            text.setAttribute("font-size", "12");
+            text.textContent = label;
+            svg.appendChild(text);
+        }
+
+        function drawCircle(svg, x, y, weight) {
+            const svgNS = "http://www.w3.org/2000/svg";
+            const circle = document.createElementNS(svgNS, "circle");
+            circle.setAttribute("cx", x);
+            circle.setAttribute("cy", y);
+            circle.setAttribute("r", 20);
+            circle.setAttribute("fill", "lightblue");
+            svg.appendChild(circle);
+
+            const text = document.createElementNS(svgNS, "text");
+            text.setAttribute("x", x);
+            text.setAttribute("y", y + 5);
+            text.setAttribute("text-anchor", "middle");
+            text.setAttribute("font-size", "12");
+            text.textContent = weight;
+            svg.appendChild(text);
+        }
+
+        function drawSquare(svg, x, y, char, freq) {
+            const svgNS = "http://www.w3.org/2000/svg";
+            const rect = document.createElementNS(svgNS, "rect");
+            rect.setAttribute("x", x - 20);
+            rect.setAttribute("y", y - 20);
+            rect.setAttribute("width", 40);
+            rect.setAttribute("height", 40);
+            rect.setAttribute("fill", "lightgreen");
+            svg.appendChild(rect);
+
+            const text = document.createElementNS(svgNS, "text");
+            text.setAttribute("x", x);
+            text.setAttribute("y", y + 5);
+            text.setAttribute("text-anchor", "middle");
+            text.setAttribute("font-size", "12");
+            text.textContent = `${char}:${freq}`;
+            svg.appendChild(text);
         }
     </script>
 
 </body>
 </html>
-

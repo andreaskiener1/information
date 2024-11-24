@@ -88,8 +88,11 @@
 
             // Sortiere die Zeichen nach Häufigkeit (aufsteigend)
             const sortedStats = Object.keys(stats).sort((a, b) => stats[a].count - stats[b].count);
-
-            let resultHTML = `<table>
+            let resultHTML = ` <p>Anzahl der Zeichen (inkl. Leerzeichen, Punkt, Komma): ${text.length}</p>
+                               <p>Mittlerer Informationsgehalt: ${avgInfoContent.toFixed(4)} bits</p>
+                               <p>Perplexität: ${perplexity.toFixed(4)}</p>
+                               <p>Gesamtinformationsgehalt: ${totalInfoContent.toFixed(4)} bits</p>   `;
+            resultHTML += `<table>
                                 <tr>
                                     <th>Zeichen</th>
                                     <th>Häufigkeit</th>
@@ -107,11 +110,7 @@
                                </tr>`;
             }
 
-            resultHTML += `</table>
-                           <p>Anzahl der Zeichen (inkl. Leerzeichen, Punkt, Komma): ${text.length}</p>
-                           <p>Mittlerer Informationsgehalt: ${avgInfoContent.toFixed(4)} bits</p>
-                           <p>Perplexität: ${perplexity.toFixed(4)}</p>
-                           <p>Gesamtinformationsgehalt: ${totalInfoContent.toFixed(4)} bits</p>`;
+            resultHTML += `</table>`;
 
             outputDiv.innerHTML = resultHTML;
         }
